@@ -1,13 +1,13 @@
 package org.jenkinsci.plugins.parameterpool;
 
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- *
+ * Parses parameter values from source text.
+ * e.g. value[1..4] will be parsed as value1,value2,value3,value4.
  */
 public class ParameterParser {
 

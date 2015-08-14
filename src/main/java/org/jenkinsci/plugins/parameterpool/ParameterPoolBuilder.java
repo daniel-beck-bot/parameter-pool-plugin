@@ -37,21 +37,7 @@ import java.util.Set;
 import java.util.StringTokenizer;
 
 /**
- * Sample {@link Builder}.
- *
- * <p>
- * When the user configures the project and enables this builder,
- * {@link DescriptorImpl#newInstance(StaplerRequest)} is invoked
- * and a new {@link ParameterPoolBuilder} is created. The created
- * instance is persisted to the project configuration XML by using
- * XStream, so this allows you to use instance fields (like {@link #name})
- * to remember the configuration.
- *
- * <p>
- * When a build is performed, the {@link #perform(AbstractBuild, Launcher, BuildListener)}
- * method will be invoked. 
- *
- * @author Kohsuke Kawaguchi
+ * Builder for parameter pool values.
  */
 public class ParameterPoolBuilder extends Builder {
 
@@ -134,8 +120,10 @@ public class ParameterPoolBuilder extends Builder {
         logger.println(parameterParser.valuesAsText());
 
 
-        String selectedPoolValue = selectPoolValue(build.getNumber(), builds, logger,
-                parameterParser.getValues());
+        PoolValueSelector valueSelector = new PoolValueSelector();
+
+        String selectedPoolValue = valueSelector.selectPoolValue(expandedName, preferError,
+                build.getNumber(), builds, logger, parameterParser.getValues());
 
         logger.println("Adding " + expandedName + " as environment variable with value of " + selectedPoolValue);
 
@@ -145,54 +133,6 @@ public class ParameterPoolBuilder extends Builder {
         build.addAction(envAction);
 
         return true;
-    }
-
-    private String selectPoolValue(int currentBuildNumber, List<Run> builds, PrintStream logger,
-                                   Set<String> allowedValues) {
-        BuildPoolValues poolValues = new BuildPoolValues();
-        int completedBuildsChecked = 0;
-        for (Run build : builds) {
-            int buildNumber = build.getNumber();
-            if (buildNumber == currentBuildNumber) {
-                continue;
-            }
-
-            // there could be running builds further before completed builds
-            if (completedBuildsChecked > 20) {
-                break;
-            }
-            Result result = build.isBuilding() ? Result.NOT_BUILT : build.getResult();
-            if (result != Result.NOT_BUILT) {
-                completedBuildsChecked ++;
-            }
-
-            String poolValue = null;
-            ParameterEnvAction parameterEnvAction = build.getAction(ParameterEnvAction.class);
-            if (parameterEnvAction != null) {
-                poolValue = parameterEnvAction.getValue(name);
-            }
-
-            logger.println("Build number " + buildNumber + ", param value: " + poolValue + ", result: " + result.toString());
-            if (parameterEnvAction == null) {
-                logger.println("No " + ParameterEnvAction.class.getSimpleName() + " found for build " + buildNumber);
-                continue;
-            }
-
-            if (poolValue == null) {
-                logger.println("No value named " + name + " added in build " + buildNumber);
-                logger.println("Pool parameters in build: " + parameterEnvAction.getNames().toString());
-                continue;
-            }
-            poolValues.addPoolValue(result, poolValue);
-        }
-        poolValues.printValues(logger);
-
-        String value = poolValues.selectValue(allowedValues, preferError);
-        if (value == null) {
-            throw new IllegalArgumentException("No allowable value found! All of these values were taken: "
-                    + allowedValues.toString());
-        }
-        return value;
     }
 
     @Override
@@ -205,7 +145,7 @@ public class ParameterPoolBuilder extends Builder {
     public static final class DescriptorImpl extends BuildStepDescriptor<Builder> {
 
         /**
-         * In order to load the persisted global configuration, you have to 
+         * In order to load the persisted global configuration, you have to
          * call load() in the constructor.
          */
         public DescriptorImpl() {
@@ -229,9 +169,8 @@ public class ParameterPoolBuilder extends Builder {
         }
 
         /**
-         * Form validation method.
-         *
-         * Copied from hudson.tasks.BuildTrigger.doCheck(Item project, String value)
+         * Checks that the project names entered are valid.
+         * Blank means that the current project name is used.
          */
         public FormValidation doCheckProjects(@AncestorInPath AbstractProject<?,?> project, @QueryParameter String value ) {
             // Require CONFIGURE permission on this project
@@ -239,36 +178,25 @@ public class ParameterPoolBuilder extends Builder {
                 return FormValidation.ok();
             }
             StringTokenizer tokens = new StringTokenizer(Util.fixNull(value),",");
-            boolean hasProjects = false;
             while(tokens.hasMoreTokens()) {
                 String projectName = tokens.nextToken().trim();
-                if (StringUtils.isNotBlank(projectName)) {
-                    Item item = Jenkins.getInstance().getItem(projectName,project,Item.class); // only works after version 1.410
-                    if(item==null){
-                        return FormValidation.error("Project name " + projectName + " not found, did you mean "
-                                + AbstractProject.findNearest(projectName).getName());
-                    }
-                    if(!(item instanceof AbstractProject)){
-                        return FormValidation.error("Project " + projectName + " is not buildable");
-                    }
-                    hasProjects = true;
+                if (StringUtils.isBlank(projectName)) {
+                    continue;
+                }
+                Item item = Jenkins.getInstance().getItem(projectName,project,Item.class); // only works after version 1.410
+                if(item==null){
+                    return FormValidation.error("Project name " + projectName + " not found, did you mean "
+                            + AbstractProject.findNearest(projectName).getName());
+                }
+                if(!(item instanceof AbstractProject)){
+                    return FormValidation.error("Project " + projectName + " is not buildable");
                 }
             }
-            if (!hasProjects) {
-//            	return FormValidation.error(Messages.BuildTrigger_NoProjectSpecified()); // only works with Jenkins version built after 2011-01-30
-                return FormValidation.error("No project specified");
-            }
-
             return FormValidation.ok();
         }
 
         /**
-         * Autocompletion method
-         *
-         * Copied from hudson.tasks.BuildTrigger.doAutoCompleteChildProjects(String value)
-         *
-         * @param value
-         * @return
+         * Autocompletes project names
          */
         public AutoCompletionCandidates doAutoCompleteProjects(@QueryParameter String value, @AncestorInPath ItemGroup context) {
             AutoCompletionCandidates candidates = new AutoCompletionCandidates();
@@ -285,7 +213,7 @@ public class ParameterPoolBuilder extends Builder {
         }
 
         public boolean isApplicable(Class<? extends AbstractProject> aClass) {
-            // Indicates that this builder can be used with all kinds of project types 
+            // Indicates that this builder can be used with all kinds of project types
             return true;
         }
 
@@ -298,30 +226,5 @@ public class ParameterPoolBuilder extends Builder {
 
     }
 
-    private static class ParameterEnvAction implements EnvironmentContributingAction {
-        // Decided not to record this data in build.xml, so marked transient:
-        private Map<String,String> data = new HashMap<String,String>();
-
-        private void add(String key, String val) {
-            if (data==null) return;
-            data.put(key, val);
-        }
-
-        public void buildEnvVars(AbstractBuild<?,?> build, EnvVars env) {
-            if (data!=null) env.putAll(data);
-        }
-
-        public String getIconFileName() { return null; }
-        public String getDisplayName() { return null; }
-        public String getUrlName() { return null; }
-
-        public String getValue(String name) {
-            return data != null ? data.get(name) : null;
-        }
-
-        public Set<String> getNames() {
-            return data != null ? data.keySet() : new HashSet<String>();
-        }
-    }
 }
 
