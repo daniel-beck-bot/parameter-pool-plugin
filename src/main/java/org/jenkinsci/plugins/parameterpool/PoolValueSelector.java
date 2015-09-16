@@ -1,9 +1,12 @@
 package org.jenkinsci.plugins.parameterpool;
 
+import hudson.model.ParameterValue;
+import hudson.model.ParametersAction;
 import hudson.model.Result;
 import hudson.model.Run;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -13,13 +16,12 @@ import java.util.Set;
 public class PoolValueSelector {
 
     public String selectPoolValue(String parameterName, boolean preferError,
-                                  int currentBuildNumber, List<Run> builds, PrintStream logger,
+                                  String buildDisplayName, List<Run> builds, PrintStream logger,
                                    Set<String> allowedValues) {
         BuildPoolValues poolValues = new BuildPoolValues();
         int completedBuildsChecked = 0;
         for (Run build : builds) {
-            int buildNumber = build.getNumber();
-            if (buildNumber == currentBuildNumber) {
+            if (build.getFullDisplayName().equals(buildDisplayName)) {
                 continue;
             }
 
@@ -32,25 +34,39 @@ public class PoolValueSelector {
                 completedBuildsChecked ++;
             }
 
-            String poolValue = null;
             ParameterEnvAction parameterEnvAction = build.getAction(ParameterEnvAction.class);
+            ParametersAction parametersAction = build.getAction(ParametersAction.class);
+
+            String parameterValue = null;
+            String parameterInfo = "No value found";
             if (parameterEnvAction != null) {
-                poolValue = parameterEnvAction.getValue(parameterName);
+                parameterValue = parameterEnvAction.getValue(parameterName);
+                parameterInfo = parameterValue + " (from parameter pool)";
+            } else if (parametersAction != null) {
+                ParameterValue matchingParameter = parametersAction.getParameter(parameterName);
+                if (matchingParameter != null) {
+                    parameterValue = String.valueOf(matchingParameter.getValue());
+                    parameterInfo = parameterValue + " (as build parameter)";
+                }
             }
 
-            logger.println(String.format("Build number %s, result %s, %s: %s",
-                    buildNumber, result.toString(), parameterName, poolValue));
-            if (parameterEnvAction == null) {
-                logger.println("No " + ParameterEnvAction.class.getSimpleName() + " found for build " + buildNumber);
+            logger.println(String.format("%s, result %s, %s: %s",
+                    build.getFullDisplayName(), result.toString(), parameterName, parameterInfo));
+
+            if (parameterValue == null) {
+                if (parameterEnvAction != null) {
+                    logger.println("No pool value named " + parameterName + " added in build " + buildDisplayName);
+                    logger.println("Pool parameters in build: " + parameterEnvAction.getNames().toString());
+                } else if (parametersAction != null) {
+                    logger.println("No parameter named " + parameterName + " added in build " + buildDisplayName);
+                    logger.println("Parameters in build: " + createParameterNameList(parametersAction).toString());
+                } else {
+                    logger.println("No parameter pool or parameters found for build " + build.getFullDisplayName());
+                }
                 continue;
             }
 
-            if (poolValue == null) {
-                logger.println("No value named " + parameterName + " added in build " + buildNumber);
-                logger.println("Pool parameters in build: " + parameterEnvAction.getNames().toString());
-                continue;
-            }
-            poolValues.addPoolValue(result, poolValue);
+            poolValues.addPoolValue(result, parameterValue);
         }
         poolValues.printValues(logger);
 
@@ -60,6 +76,14 @@ public class PoolValueSelector {
                     + allowedValues.toString());
         }
         return value;
+    }
+
+    private List<String> createParameterNameList(ParametersAction parameterValues) {
+        List<String> names = new ArrayList<String>();
+        for (ParameterValue parameterValue : parameterValues.getParameters()) {
+            names.add(parameterValue.getName());
+        }
+        return names;
     }
 
 }

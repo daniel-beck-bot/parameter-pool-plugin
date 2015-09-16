@@ -83,6 +83,9 @@ public class ParameterPoolBuilder extends Builder {
             projectsToUse.add(build.getProject());
         } else {
             for (String potentialName : projects.split(",")) {
+                if (potentialName.trim().isEmpty()) {
+                    continue;
+                }
                 AbstractProject matchingProject = AbstractProject.findNearest(potentialName);
                 if (matchingProject == null) {
                     throw new IllegalArgumentException("Project name " + potentialName + " was not found!");
@@ -91,9 +94,11 @@ public class ParameterPoolBuilder extends Builder {
             }
         }
 
+        PrintStream logger = listener.getLogger();
 
         List<Run> builds = new ArrayList<Run>();
         for (AbstractProject project : projectsToUse) {
+            logger.println("Adding builds for project " + project.getName());
             builds.addAll(project.getBuilds());
         }
 
@@ -104,7 +109,6 @@ public class ParameterPoolBuilder extends Builder {
             }
         });
 
-        PrintStream logger = listener.getLogger();
         EnvVars env = build.getEnvironment(listener);
 
         String expandedName = env.expand(name);
@@ -123,7 +127,7 @@ public class ParameterPoolBuilder extends Builder {
         PoolValueSelector valueSelector = new PoolValueSelector();
 
         String selectedPoolValue = valueSelector.selectPoolValue(expandedName, preferError,
-                build.getNumber(), builds, logger, parameterParser.getValues());
+                build.getFullDisplayName(), builds, logger, parameterParser.getValues());
 
         logger.println("Adding " + expandedName + " as environment variable with value of " + selectedPoolValue);
 
