@@ -20,6 +20,7 @@ public class PoolValueSelector {
                                    Set<String> allowedValues) {
         BuildPoolValues poolValues = new BuildPoolValues();
         int completedBuildsChecked = 0;
+        logger.println("Checking previous builds for parameter " + parameterName);
         for (Run build : builds) {
             if (build.getFullDisplayName().equals(buildDisplayName)) {
                 continue;
@@ -46,12 +47,12 @@ public class PoolValueSelector {
                 ParameterValue matchingParameter = parametersAction.getParameter(parameterName);
                 if (matchingParameter != null) {
                     parameterValue = String.valueOf(matchingParameter.getValue());
-                    parameterInfo = parameterValue + " (as build parameter)";
+                    parameterInfo = parameterValue + " (from build parameters)";
                 }
             }
 
-            logger.println(String.format("%s, result %s, %s: %s",
-                    build.getFullDisplayName(), result.toString(), parameterName, parameterInfo));
+            logger.println(String.format("%s - %s, %s",
+                    build.getFullDisplayName(), result.toString(), parameterInfo));
 
             if (parameterValue == null) {
                 if (parameterEnvAction != null) {
@@ -68,6 +69,7 @@ public class PoolValueSelector {
 
             poolValues.addPoolValue(result, parameterValue);
         }
+        logger.println("Finished checking previous builds for parameter " + parameterName);
         poolValues.printValues(logger);
 
         String value = poolValues.selectValue(allowedValues, preferError);

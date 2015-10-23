@@ -98,7 +98,7 @@ public class ParameterPoolBuilder extends Builder {
 
         List<Run> builds = new ArrayList<Run>();
         for (AbstractProject project : projectsToUse) {
-            logger.println("Adding builds for project " + project.getName());
+            logger.println("Checking project(s) " + project.getName() + " for parameter pool values");
             builds.addAll(project.getBuilds());
         }
 

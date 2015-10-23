@@ -80,8 +80,16 @@ public class BuildPoolValues {
 
 
     public void printValues(PrintStream logger) {
-        logger.println("Parsed following pool values from running builds " + valuesFromRunningBuilds.toString());
-        logger.println("Parsed following pool values from functional builds " + valuesFromFunctionalBuilds.toString());
-        logger.println("Parsed following pool values from non functional builds " + valuesFromFailedBuilds.toString());
+        printResult("running", valuesFromRunningBuilds, logger);
+        printResult("functional", valuesFromFunctionalBuilds, logger);
+        printResult("non functional", valuesFromFailedBuilds, logger);
+    }
+
+    private void printResult(String buildDescription, Set<String> values, PrintStream logger) {
+        if (values.isEmpty()) {
+            logger.println("No values parsed from " + buildDescription + " builds");
+        } else {
+            logger.println("Parsed following pool values from " + buildDescription + " builds " + values.toString());
+        }
     }
 }
