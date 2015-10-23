@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>parameter-pool</artifactId>
-    <version>1.0.2-SNAPSHOT</version>
+    <version>1.0.2</version>
     <packaging>hpi</packaging>
 
     <name>Parameter Pool Plugin</name>
