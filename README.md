@@ -1,6 +1,8 @@
 # parameter-pool-plugin
 Jenkins plugin for selecting a unique parameter from a parameter pool
 
+Wiki url: https://wiki.jenkins-ci.org/display/JENKINS/Parameter+Pool+Plugin
+
 Plugin adds a build step for setting a pool of values for a paramter.
 Ensures that a unique value will be used for each concurrent build.
 E.g. no two running builds will use the same parameter value.
