@@ -77,12 +77,13 @@ public class ParameterPoolBuilder extends Builder {
     @Override
     public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener) throws IOException,
             InterruptedException {
-
+        EnvVars env = build.getEnvironment(listener);
         List<AbstractProject> projectsToUse = new ArrayList<AbstractProject>();
         if (StringUtils.isBlank(projects)) {
             projectsToUse.add(build.getProject());
         } else {
-            for (String potentialName : projects.split(",")) {
+            String expandedProjects = env.expand(projects);
+            for (String potentialName : expandedProjects.split(",")) {
                 if (potentialName.trim().isEmpty()) {
                     continue;
                 }
@@ -108,8 +109,6 @@ public class ParameterPoolBuilder extends Builder {
                 return new Long(secondRun.getStartTimeInMillis()).compareTo(firstRun.getStartTimeInMillis());
             }
         });
-
-        EnvVars env = build.getEnvironment(listener);
 
         String expandedName = env.expand(name);
         String expandedValues = env.expand(values);

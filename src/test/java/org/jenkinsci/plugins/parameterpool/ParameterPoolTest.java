@@ -14,6 +14,8 @@ import org.junit.Test;
 import org.jvnet.hudson.test.JenkinsRule;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import static org.junit.Assert.assertEquals;
@@ -135,7 +137,18 @@ public class ParameterPoolTest {
     private FreeStyleProject createProject(String name, String projectNamesForBuilder, int sleepDuration, boolean preferError) throws IOException {
         FreeStyleProject project = jenkins.createFreeStyleProject(name);
         project.setConcurrentBuild(true);
-        project.getBuildersList().add(new ParameterPoolBuilder(projectNamesForBuilder, "testValue", "vm[1..3]", preferError));
+        int nameCounter = 0;
+        String projectParameterName = "";
+        List<ParameterDefinition> projectNameParameters = new ArrayList<ParameterDefinition>();
+        for (String projectName : projectNamesForBuilder.split(",")) {
+            projectNameParameters.add(new StringParameterDefinition("projectName" + ++nameCounter, projectName));
+            if (!projectParameterName.isEmpty()) {
+                projectParameterName += ",";
+            }
+            projectParameterName += "${projectName" + nameCounter + "}";
+        }
+        project.addProperty(new ParametersDefinitionProperty(projectNameParameters));
+        project.getBuildersList().add(new ParameterPoolBuilder(projectParameterName, "testValue", "vm[1..3]", preferError));
         project.getBuildersList().add(new Shell("sleep " + sleepDuration + ";\necho Vm ${testValue} used for testing"));
         return project;
     }
