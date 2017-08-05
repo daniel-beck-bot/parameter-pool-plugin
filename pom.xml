@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>parameter-pool</artifactId>
-    <version>1.0.3-SNAPSHOT</version>
+    <version>1.0.3</version>
     <packaging>hpi</packaging>
 
     <name>Parameter Pool Plugin</name>
@@ -36,7 +36,7 @@
         <connection>scm:git:https://github.com/jenkinsci/${project.artifactId}-plugin.git</connection>
         <developerConnection>scm:git:https://github.com/jenkinsci/${project.artifactId}-plugin.git</developerConnection>
         <url>https://github.com/jenkinsci/${project.artifactId}-plugin</url>
-      <tag>HEAD</tag>
+      <tag>parameter-pool-1.0.3</tag>
   </scm>
 
     <repositories>
